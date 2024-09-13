@@ -1,62 +1,40 @@
-Table of Contents
+# Table of Contents
 
-Overview
+1.Overview
+2.Prerequisites
+3.Installation of Argo Rollouts Plugins
+  Argo Rollouts Controller Installation
+  Kubectl Plugin Installation
+4.Define Rollout Configuration
+5.Define Services
+6.Define Values for Helm Chart
+7.Deploy Rollout
+  Using ArgoCD
+  Using kubectl
+  Using Helm
+8.Verify Deployment
+9.Directory Structure
+10. Promoting the Deployment
+11.Argo Rollouts Workflow
+   Initial Deployment
+   Deploying a New Version
+   Promotion and Rollback
+12.Commands for Monitoring and Management
 
-Prerequisites
+13.Conclusion
 
-Installation of Argo Rollouts Plugins
-
-Argo Rollouts Controller Installation
-
-Kubectl Plugin Installation
-
-Define Rollout Configuration
-
-Define Services
-
-Define Values for Helm Chart
-
-Deploy Rollout
-
-Using ArgoCD
-
-Using kubectl
-
-Using Helm
-
-Verify Deployment
-
-Directory Structure
-
-Promoting the Deployment
-
-Argo Rollouts Workflow
-
-Initial Deployment
-
-Deploying a New Version
-
-Promotion and Rollback
-
-Commands for Monitoring and Management
-
-Conclusion
-
-Overview
+## Overview
 
 This document provides a comprehensive guide to implementing Blue-Green deployments using Argo Rollouts on your Kubernetes cluster. The goal is to outline the installation, configuration, and deployment steps necessary for utilizing Argo Rollouts with a Blue-Green strategy.
 
-Prerequisites
+## Prerequisites
 
-Kubernetes cluster
+1.Kubernetes cluster
+2.kubectl configured to access the cluster
+3.The Argo Rollouts plugin should be installed in the cluster to manage Blue-Green deployments.
+4. Helm (optional, if deploying via Helm charts)
 
-kubectl configured to access the cluster
-
-The Argo Rollouts plugin should be installed in the cluster to manage Blue-Green deployments.
-
-Helm (optional, if deploying via Helm charts)
-
-1. Installation of Argo Rollouts Plugins
+#1. Installation of Argo Rollouts Plugins
 
 Argo Rollouts Controller Installation
 
