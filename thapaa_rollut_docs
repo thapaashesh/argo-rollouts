@@ -1,0 +1,508 @@
+Table of Contents
+
+Overview
+
+Prerequisites
+
+Installation of Argo Rollouts Plugins
+
+Argo Rollouts Controller Installation
+
+Kubectl Plugin Installation
+
+Define Rollout Configuration
+
+Define Services
+
+Define Values for Helm Chart
+
+Deploy Rollout
+
+Using ArgoCD
+
+Using kubectl
+
+Using Helm
+
+Verify Deployment
+
+Directory Structure
+
+Promoting the Deployment
+
+Argo Rollouts Workflow
+
+Initial Deployment
+
+Deploying a New Version
+
+Promotion and Rollback
+
+Commands for Monitoring and Management
+
+Conclusion
+
+Overview
+
+This document provides a comprehensive guide to implementing Blue-Green deployments using Argo Rollouts on your Kubernetes cluster. The goal is to outline the installation, configuration, and deployment steps necessary for utilizing Argo Rollouts with a Blue-Green strategy.
+
+Prerequisites
+
+Kubernetes cluster
+
+kubectl configured to access the cluster
+
+The Argo Rollouts plugin should be installed in the cluster to manage Blue-Green deployments.
+
+Helm (optional, if deploying via Helm charts)
+
+1. Installation of Argo Rollouts Plugins
+
+Argo Rollouts Controller Installation
+
+To use Blue-Green deployments with ArgoCD, install the Argo Rollouts controller in your Kubernetes cluster.
+
+Using Helm:
+
+Add the Argo Helm repository:
+
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+
+Install Argo Rollouts:
+
+helm install argo-rollouts argo/argo-rollouts
+
+Using kubectl:
+
+Apply the Custom Resource Definitions (CRDs) and Rollouts controller manifests:
+
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-rollouts/master/manifests/rollouts-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-rollouts/master/manifests/rollouts-controller.yaml
+
+Kubectl Plugin Installation
+
+The kubectl-argo-rollouts plugin is optional but provides a convenient way to manage and visualize rollouts from the command line.
+
+Using Homebrew (macOS):
+
+Install the plugin with Homebrew:
+
+codebrew install argoproj/tap/kubectl-argo-rollouts
+
+Manual Installation:
+
+Download the appropriate binary:
+
+For macOS:
+
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-darwin-amd64
+
+For Linux:
+
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+
+Make the binary executable:
+
+codechmod +x ./kubectl-argo-rollouts-<os>-amd64
+
+
+Move the binary to a directory in your PATH:
+
+sudo mv ./kubectl-argo-rollouts-<os>-amd64 /usr/local/bin/kubectl-argo-rollouts
+
+Verify the installation:
+
+kubectl argo rollouts version
+
+2. Define Rollout Configuration
+
+Create a Rollout YAML file to define the application rollout strategy. Below is an example of a Rollout configuration that uses the Blue-Green deployment strategy. The example is for a "copui-dashboard" application. 
+
+Rollout Configuration
+
+rollout.yaml
+
+apiVersion: argoproj.io/v1alpha1
+
+kind: Rollout
+
+metadata:
+
+  name: {{ .Chart.Name }}
+
+spec:
+
+  replicas: 3
+
+  strategy:
+
+    blueGreen:
+
+      activeService: dashboard-active
+
+      previewService: dashboard-preview
+
+      autoPromotionEnabled: true
+
+  selector:
+
+    matchLabels:
+
+      app: {{ .Chart.Name }}
+
+  template:
+
+    metadata:
+
+      labels:
+
+        app: {{ .Chart.Name }}
+
+    spec:
+
+      imagePullSecrets:
+
+        - name: harbor-project
+
+      containers:
+
+        - name: {{ .Chart.Name }}
+
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+Notes:
+
+Replace {{ .Chart.Name }}  with the name of your application.
+
+Ensure dashboard-active and dashboard-preview services are correctly defined and align with your service names.
+
+3. Define Services
+
+Create Service YAML files for both the active and preview services.
+
+Service Definitions
+
+service-preview.yaml
+
+apiVersion: v1
+
+kind: Service
+
+metadata:
+  name: dashboard-preview
+
+spec:
+  selector:
+    app: {{ .Chart.Name }}
+    rollouts-pod-template-hash: PREVIEW_HASH   # Updated automatically by Argo Rollouts
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+
+service-active.yaml
+
+apiVersion: v1
+
+kind: Service
+
+  metadata:
+name: dashboard-active
+
+  spec:
+    selector:
+      app: {{ .Chart.Name }}
+      rollouts-pod-template-hash: ACTIVE_HASH   # Updated automatically by Argo Rollouts
+ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+Notes:
+
+Replace {{ .Chart.Name }} with your application name.
+ACTIVE_HASH and PREVIEW_HASH are placeholders and will be replaced automatically by the Argo Rollouts controller.
+
+
+4. Define Values for Helm Chart
+
+Configure the values.yaml to include settings for the Rollout strategy.
+
+Helm Values
+
+values.yaml
+
+service:
+active:
+name: dashboard-active
+port: 80
+targetPort: 8080
+preview:
+name: dashboard-preview
+port: 80
+targetPort: 8080
+
+useRollout: true  # Set this to true to use Rollouts, false to use Deployment
+
+replicaCount: 3
+
+Notes:
+
+Adjust service.active and service.preview names as per your configuration.
+Ensure useRollout is set to true to enable Argo Rollouts.
+
+
+5. Deploy Rollout
+
+Apply the Rollout, Service, and Values configurations using kubectl. or merge your PR and sync the app in ArgoCD to reflect the changes.
+
+Using ArgoCD
+
+After adding the rollout.yaml and services.yaml files to the application Helm chart, please merge your PR and sync the app in ArgoCD to reflect the changes.
+
+Using kubectl
+
+kubectl apply -f rollout.yaml
+
+kubectl apply -f service-preview.yaml
+
+kubectl apply -f service-active.yaml
+
+Using Helm
+
+If deploying via Helm, ensure your values.yaml is properly configured and then use:
+
+helm upgrade --install my-release ./my-chart --values values.yaml
+
+
+Verify Deployment
+
+After applying the Rollout configuration, you can check the status of the rollout using:
+
+kubectl argo rollouts get rollout {{ .Chart.Name }}
+kubectl argo rollouts dashboard {{ .Chart.Name }}
+
+
+3. Directory Structure
+Below is an example directory structure for organizing your deployment files:
+
+
+
+/my-app-deployment
+│
+├── charts
+│   └── my-app
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates
+│           ├── service-active.yaml
+│           ├── service-preview.yaml
+│           └── rollout.yaml
+│
+└── kubernetes
+    ├── service-active.yaml
+    ├── service-preview.yaml
+    └── rollout.yaml
+
+
+Promoting the Deployment
+
+Argo Rollouts handles Blue-Green deployment and promotion. To manually promote the preview version to the active environment:
+
+Trigger Promotion via CLI:
+
+kubectl argo rollouts promote dashboard
+
+Monitor Progress in the ArgoCD UI or via CLI:
+
+kubectl argo rollouts get rollout dashboard
+
+kubectl argo rollouts history dashboard
+
+
+Argo Rollouts Workflow
+
+Initial Deployment
+
+Deploy Initial Version:
+
+ArgoCD deploys the initial version of your application as defined in rollout.yaml.
+Argo Rollouts creates a set of pods running the initial version and exposes them through the dashboard-active service.
+
+
+What happen when we Deploy a New Version
+
+Overview of Blue-Green Deployment
+
+In a Blue-Green deployment strategy:
+
+Active Environment: The currently live version of the application that users are accessing.
+
+Preview Environment: The new version of the application that you want to test before it becomes live.
+
+Steps in Deploying a New Version
+
+Update Application Configuration:
+
+When a new version is ready, you will update the image field in your rollout.yaml configuration file. This change specifies the new version of the container image that you want to deploy.
+
+Example Update in rollout.yaml:
+
+spec:
+  template:
+    spec:
+      containers:
+        - name: dashboard
+          image: "myrepo/dashboard:new-version"
+
+
+Commit Changes:
+
+After updating the rollout.yaml file, commit and push the changes to your Git repository.
+
+git add rollout.yaml
+git commit -m "Update dashboard to new-version"
+git push origin main
+
+
+ArgoCD Syncs Changes:
+
+ArgoCD detects the changes in the Git repository. Since ArgoCD is configured to monitor the repository and sync automatically, it will start the deployment process for the new version.
+
+Deployment to Preview Environment:
+
+ArgoCD will apply the updated rollout.yaml file to your Kubernetes cluster. Here’s what happens in this step:
+
+New Pods Creation: Argo Rollouts will start creating new pods with the updated image in the preview environment.
+
+Service Update: Thedashboard-preview service is updated to route traffic to the new pods running the updated version.
+
+Preview Service Configuration:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-preview
+spec:
+  selector:
+    app: dashboard
+    rollouts-pod-template-hash: PREVIEW_HASH   # Updated automatically
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+
+Validation and Testing:
+
+You can now validate and test the new version in the preview environment. This might involve:
+
+Manual Testing: Accessing the preview environment to ensure the new version works as expected.
+
+Automated Tests: Running automated tests against the preview version
+
+Promotion to Active Environment:
+
+Once the new version in the preview environment is validated and deemed ready for production, it needs to be promoted to the active environment.
+
+Automatic Promotion:
+
+If autoPromotionEnabled is true
+
+, Argo Rollouts will automatically promote the preview version to the active environment after successful health checks and testing.
+
+The dashboard-preview service will become the dashboard-active service, and the new version will be live.
+
+Update Active Service:
+
+Once promoted, the dashboard-active service will start routing traffic to the new pods running the updated version. The previous version pods are scaled down or terminated based on the deployment strategy.
+
+Active Service Configuration:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-active
+spec:
+  selector:
+    app: dashboard
+    rollouts-pod-template-hash: ACTIVE_HASH   # Updated automatically
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+
+Clean-Up:
+
+After the new version is live and stable, the previous version's pods and services may be cleaned up, depending on your configuration and deployment strategy.
+
+Diagram of Blue-Green Deployment
+
+Here's a simplified diagram to visualize the Blue-Green deployment process:
+
++-------------------+     +-------------------+
+|  Active Service   |     |  Preview Service  |
+|  (Old Version)    |     |  (New Version)    |
+|                   |     |                   |
++-------------------+     +-------------------+
+          |                     |
+          v                     v
+    +--------------+     +------------------+
+    |  Pods        |     |  Pods            |
+    |  (Old Version) |     |  (New Version)   |
+    +--------------+     +------------------+
+          |
+          v
+    User Traffic
+
+
+Deploy New Version:
+
+When a new version is available, update the image field in rollout.yaml and commit the changes.
+ArgoCD detects changes and deploys the new version to the preview environment.
+New pods are created for the preview version, and the dashboard-preview service is updated.
+
+
+Promotion and Rollback
+
+Automatic Promotion:
+
+If autoPromotionEnabled is true, Argo Rollouts automatically promotes the preview version to the active environment after successful deployment and health checks. The dashboard-preview service becomes the dashboard-active service. Manual Promotion:
+
+Manually promote the preview version using:
+
+kubectl argo rollouts promote dashboard
+
+Rollback:
+
+To roll back to a previous version, use:
+
+kubectl argo rollouts rollback dashboard
+
+Argo Rollouts will roll back to the last successful deployment, swapping services as needed.
+Commands for Monitoring and Management
+
+Watch Rollout Progress:
+
+kubectl argo rollouts get rollout dashboard --watch
+
+Check Rollout Status:
+
+kubectl argo rollouts status dashboard
+
+View Rollout History:
+
+kubectl argo rollouts history dashboard
+
+Get Rollout Details:
+
+kubectl argo rollouts get rollout dashboard
+
+Conclusion
+
+This documentation outlines the process for setting up Blue-Green deployments using Argo Rollouts. Make sure to adapt the configuration files to your specific needs and validate the deployment by checking the status and logs as necessary.
+
+For further details, refer to the Argo Rollouts documentation.
